@@ -4,8 +4,7 @@
     "module": "commonjs",
     "sourceMap": true,
     "outDir": "dist",
+    "sourceRoot": "./src/**/**.ts"
   },
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"]
 }
