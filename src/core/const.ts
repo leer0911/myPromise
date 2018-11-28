@@ -6,4 +6,8 @@ const PROMISE_STATUS = {
   rejected: 2
 };
 
-export { TRY_CATCH_ERROR, PROMISE_STATUS };
+const PROMISE_ID = Math.random()
+  .toString(36)
+  .substring(2);
+
+export { TRY_CATCH_ERROR, PROMISE_STATUS, PROMISE_ID };

@@ -5,7 +5,7 @@ import {
   cannotReturnOwn
 } from '../utils/error';
 import { isObjectORFunction, isFunction } from '../utils/is';
-import { TRY_CATCH_ERROR, PROMISE_STATUS } from './const';
+import { TRY_CATCH_ERROR, PROMISE_STATUS, PROMISE_ID } from './const';
 import asap from './asap';
 export interface Thenable<R> {
   then<U>(
@@ -31,12 +31,16 @@ export interface Resolver<R> {
 }
 
 type PromiseStatus = 'pending' | 'fulfilled' | 'rejected';
+
+let id = 0;
 export default class Promise<R> implements Thenable<R> {
   private ['[[PromiseStatus]]']: PromiseStatus = 'pending';
   private ['[[PromiseValue]]']: any = undefined;
   private subscribes: any[] = [];
 
   constructor(resolver: Resolver<R>) {
+    this[PROMISE_ID] = id++;
+
     // resolver 必须为函数
     typeof resolver !== 'function' && resolverError();
 
@@ -66,16 +70,23 @@ export default class Promise<R> implements Thenable<R> {
     return sameConstructor && sameThen && sameResolve;
   }
   private subscribe(parent, child, onFulfillment, onRejection) {
-    let { subscribes } = parent;
-    let { length } = subscribes;
+    let {
+      subscribes,
+      subscribes: { length }
+    } = parent;
 
     subscribes[length] = child;
     subscribes[length + PROMISE_STATUS.fulfilled] = onFulfillment;
     subscribes[length + PROMISE_STATUS.rejected] = onRejection;
 
     if (length === 0) {
-      asap(this.publish, parent);
+      this.asap(this.publish, parent);
     }
+  }
+  private asap(callback, context?) {
+    setTimeout(() => {
+      callback.call(this);
+    }, 1);
   }
   private publish() {
     const subscribes = this.subscribes;
@@ -96,6 +107,7 @@ export default class Promise<R> implements Thenable<R> {
         callback(result);
       }
     }
+    this.subscribes.length = 0;
   }
   private tryCatch(callback, detail) {
     try {
@@ -108,10 +120,8 @@ export default class Promise<R> implements Thenable<R> {
   private invokeCallback(settled, child, callback, detail) {
     const hasCallback = isFunction(callback);
     let value, error, succeeded, failed;
-
     if (hasCallback) {
       value = this.tryCatch(callback, detail);
-
       if (value === TRY_CATCH_ERROR) {
         failed = true;
         error = value.error;
@@ -120,8 +130,8 @@ export default class Promise<R> implements Thenable<R> {
         succeeded = true;
       }
 
-      if (this === value) {
-        this.mockReject(cannotReturnOwn());
+      if (child === value) {
+        this.mockReject.call(child, cannotReturnOwn());
         return;
       }
     } else {
@@ -134,22 +144,22 @@ export default class Promise<R> implements Thenable<R> {
     }
 
     if (hasCallback && succeeded) {
-      this.mockResolve(value);
+      this.mockResolve.call(child, value);
       return;
     }
 
     if (failed) {
-      this.mockReject(error);
+      this.mockReject.call(child, error);
       return;
     }
 
     if (settled === 'fulfilled') {
-      this.fulfill(value);
+      this.fulfill.call(child, value);
       return;
     }
 
     if (settled === 'rejected') {
-      this.mockReject(value);
+      this.mockReject.call(child, value);
       return;
     }
   }
@@ -180,7 +190,7 @@ export default class Promise<R> implements Thenable<R> {
     }
   }
   private handleForeignThenable(thenable: any, then: any) {
-    asap(() => {
+    this.asap(() => {
       let sealed = false;
       const error = this.tryThen(
         then,
@@ -210,7 +220,7 @@ export default class Promise<R> implements Thenable<R> {
         sealed = true;
         this.mockReject(error);
       }
-    }, this);
+    });
   }
   private handleLikeThenable(value: any, then: any) {
     if (this.isThenable(value, then)) {
@@ -232,7 +242,7 @@ export default class Promise<R> implements Thenable<R> {
     this['[[PromiseStatus]]'] = 'fulfilled';
     this['[[PromiseValue]]'] = value;
     if (this.subscribes.length !== 0) {
-      asap(this.publish, this);
+      this.asap(this.publish);
     }
   }
   private getThen(value: any) {
@@ -255,16 +265,27 @@ export default class Promise<R> implements Thenable<R> {
     }
     this.handleLikeThenable(value, this.getThen(value));
   }
-  private mockReject(reason: any) {}
-
+  private mockReject(reason: any) {
+    this['[[PromiseStatus]]'] = 'rejected';
+    this['[[PromiseValue]]'] = reason;
+    this.asap(this.publishRejection);
+  }
+  private publishRejection() {
+    this.publish();
+  }
   then(onFulfilled?, onRejected?) {
     const parent: any = this;
     const child = new parent.constructor(() => {});
     const state = PROMISE_STATUS[this['[[PromiseStatus]]']];
     if (state) {
       const callback = arguments[state - 1];
-      asap(() =>
-        this.invokeCallback(state, child, callback, this['[[PromiseValue]]'])
+      this.asap(() =>
+        this.invokeCallback(
+          this['[[PromiseStatus]]'],
+          child,
+          callback,
+          this['[[PromiseValue]]']
+        )
       );
     } else {
       this.subscribe(parent, child, onFulfilled, onRejected);

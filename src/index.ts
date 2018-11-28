@@ -1,10 +1,15 @@
 import Promise from './core/promise';
 
 const promise = new Promise((resolve, reject) => {
-  resolve('{ a: 1 }');
+  resolve(this);
 });
 
-promise.then(data => {
+const child = promise.then(data => {
+  console.log(data);
+  return data;
+});
+
+child.then(data => {
   console.log(data);
 });
 

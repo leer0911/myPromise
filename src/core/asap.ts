@@ -7,7 +7,7 @@ const flush = () => {
     let callback = queue[i];
     let arg = queue[i + 1];
 
-    callback(arg);
+    callback.call(arg);
 
     queue[i] = undefined;
     queue[i + 1] = undefined;
