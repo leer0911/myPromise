@@ -14,6 +14,10 @@
 
 笔者希望仅通过看这一篇文章就可以对 Promise 有个深刻的认知，所以会从方方面面讲 Promise，读者可选读。
 
+## 为什么要实现 Promise
+
+Promise 出现在 Es6 ，如果 Es5 需要使用 Promise，通常需要用到 `Promise-polyfill` 。也就是说，我们要实现的是一个 polyfill。实现它不仅有助于我们深入了解 Promise 而且能减少使用中犯错的概率，以至于获得 Promise 最佳实践。
+
 ## Promise
 
 > Promise 表示一个异步操作的最终结果，与之进行交互的方式主要是 then 方法，该方法注册了两个回调函数，用于接收 promise 的终值或本 promise 不能执行的原因。
@@ -58,7 +62,7 @@
 
   **处于拒绝态时，promise 需满足：`不能`迁移至其他任何状态，必须拥有一个`不可变`的`据因`**
 
-这里的不可变指的是恒等（即可用 `===` 判断相等），而不是意味着更深层次的不可变（ 指当 value 或 reason 不是[基本值](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Data_structures)时，只要求其引用地址相等，但属性值可被更改）。
+> 这里的不可变指的是恒等（即可用 `===` 判断相等），而不是意味着更深层次的不可变（ 指当 value 或 reason 不是[基本值](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Data_structures)时，只要求其引用地址相等，但属性值可被更改）。
 
 ### Then 方法
 
@@ -86,7 +90,7 @@ promise.then(onFulfilled, onRejected);
 
 - then 方法必须返回一个 promise 对象
 
-## Then 参数 (函数) 返回值
+### Then 参数 (函数) 返回值
 
 希望读者可以认真看这部分的内容，对于理解 promise 的 `then` 方法有很大的帮助。
 
@@ -96,17 +100,19 @@ promise.then(onFulfilled, onRejected);
 
 大致的过程是，promise 会从 `pending` 转为 `fulfilled` 或 `rejected` ，然后对应调用 `then` 方法参数的 `onFulfilled` 或 `onRejected` ，最终返回 `promise` 对象。
 
+进一步理解，假定  有如下两个 promise：
+
 ```js
 promise2 = promise1.then(onFulfilled, onRejected);
 ```
 
-考虑以下几种情况：
+会有以下几种情况：
 
-- 如果 `onFulfilled` 或者 `onRejected` **抛出异常 e** ，则 promise2 **必须拒绝执行**，并返回 `拒因 e`
+1. 如果 `onFulfilled` 或者 `onRejected` **抛出异常 e** ，则 promise2 **必须拒绝执行**，并返回 `拒因 e`
 
-- 如果 `onFulfilled` **不是函数** 且 promise1 成功执行， promise2 必须成功执行并返回 **相同的值**
+2. 如果 `onFulfilled` **不是函数** 且 promise1 成功执行， promise2 必须成功执行并返回 **相同的值**
 
-- 如果 `onRejected` **不是函数** 且 promise1 拒绝执行， promise2 必须拒绝执行并返回 **相同的据因**
+3. 如果 `onRejected` **不是函数** 且 promise1 拒绝执行， promise2 必须拒绝执行并返回 **相同的据因**
 
 希望进一步搞懂的，可以将下面代码拷贝到 chrome 控制台或其他可执行环境感受一下：
 
@@ -164,13 +170,13 @@ promise1
 
 下面还有一个比较重要的情况，它关系到业务场景中传值问题：
 
-- `onFulfilled` 或者 `onRejected` 返回 **一个 JavaScript 合法值** 的情况
+4. `onFulfilled` 或者 `onRejected` 返回 **一个 JavaScript 合法值** 的情况
 
 我们先来假定 then 方法内部有一个叫做 `[[Resolve]]` 的方法用于处理这种特殊情况，下面来具体了解下这个方法。
 
-## `[[Resolve]]` 方法
+### `[[Resolve]]` 方法
 
-一般像 `[[]]` 这样的认为是内部实现，`[[Resolve]]` 方法接受两个参数：
+一般像 `[[...]]` 这样的认为是内部实现，如 `[[Resolve]]`，该方法接受两个参数：
 
 ```js
 [[Resolve]](promise, x);
@@ -183,6 +189,111 @@ promise1
 - `x` 为对象或函数
 
 - `x` 为 `Promise`
+
+另外 promise 不能与 x 相等即 `promise !== x`,否则：
+
+![](./img/same.png)
+
+下面来看张图，大致了解下各情况的应对方式：
+
+![](./img/resolve.png)
+
+### `Promise/A+` 小结
+
+至此，`Promise/A+` 需要  了解的就讲完了。主要包括了，术语以及 Then 方法的用法和相关注意事项。需要特别注意的是，then 方法中参数返回值的处理。接下来，我们在规范的基础上，用 TypeScript 来  实现 Promise。
+
+## Promise 实现
+
+Promise 本身是一个构造函数，即可以实现为类。接下来，主要围绕实现一个 Promise 类来讲。
+
+先来看下一个标准 promise 对象具备的属性和方法，做到心中有数。
+
+![](./img/3.png)
+![](./img/2.png)
+
+下面开始正式的实现部分
+
+### 声明文件
+
+在开始前，先来了解下，用 TypeScript 写 Promise 涉及的一些类型声明。可以看这个[声明文件](https://github.com/leer0911/myPromise/blob/master/index.d.ts)。
+
+主要包括：
+
+![](./img/4.png)
+
+### 构造函数
+
+构造函数接受一个 `Resolver` 类型的函数作为唯一参数，该函数接受两个参数，resolve 和 reject。用于处理 promise 状态。
+
+```ts
+class Promise {
+  // 内部属性
+  private ['[[PromiseStatus]]']: PromiseStatus = 'pending';
+  private ['[[PromiseValue]]']: any = undefined;
+
+  subscribes: any[] = [];
+
+  constructor(resolver: Resolver<R>) {
+    this[PROMISE_ID] = id++;
+    // resolver 必须为函数
+    typeof resolver !== 'function' && resolverError();
+    // 使用 Promise 构造函数，需要用 new 操作符
+    this instanceof Promise ? this.init(resolver) : constructorError();
+  }
+
+  private init(resolver: Resolver<R>) {
+    try {
+      // 传入两个参数及用户传入的值。
+      resolver(
+        value => {
+          this.mockResolve(value);
+        },
+        reason => {
+          this.mockReject(reason);
+        }
+      );
+    } catch (e) {
+      this.mockReject(e);
+    }
+    return null;
+  }
+
+  private mockResolve(){
+    // TODO
+  }
+  private mockReject(){
+    // TODO
+  }
+}
+```
+
+### [[Resolve]] 实现
+
+前面 Promise 规范部分，我们了解到 `[[Resolve]]` 属于内部实现，用于处理 then 参数的返回值。这里主要实现能够处理构造函数里面的 `resolve(value)` value 终值的名为 `mockResolve` 的方法。
+
+![](./img/5.png)
+
+从前面规范内容可以得知，`mockResolve` 方法接受的 value 可能为 Promise，thenable，其他。
+
+```ts
+private mockResolve(value: any) {
+  // resolve 不能传入当前返回的 promise
+  // 即 `[[Resolve]](promise,x)` 中 promise ！== x
+  if (value === this) {
+    this.mockReject(resolveSelfError);
+    return;
+  }
+  // 非对象和函数，直接处理
+  if (!isObjectORFunction(value)) {
+    this.fulfill(value);
+    return;
+  }
+  // 处理一些像 promise 的对象或函数，即 thenable
+  this.handleLikeThenable(value, this.getThen(value));
+}
+```
+
+
 
 ## 参考
 
