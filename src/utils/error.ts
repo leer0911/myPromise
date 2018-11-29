@@ -18,4 +18,14 @@ const cannotReturnOwn = () => {
   return new TypeError('A promises callback cannot return that same promise.');
 };
 
-export { constructorError, resolverError, resolveSelfError, cannotReturnOwn };
+const validationError = () => {
+  return new Error('Array Methods must be provided an Array');
+};
+
+export {
+  constructorError,
+  resolverError,
+  resolveSelfError,
+  cannotReturnOwn,
+  validationError
+};

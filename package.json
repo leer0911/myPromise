@@ -18,5 +18,9 @@
   "homepage": "https://github.com/leer0911/myPromise#readme",
   "devDependencies": {
     "typescript": "^3.1.6"
+  },
+  "dependencies": {
+    "es6-promise": "^4.2.5",
+    "promise": "^8.0.2"
   }
 }

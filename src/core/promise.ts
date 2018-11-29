@@ -6,7 +6,6 @@ import {
 } from '../utils/error';
 import { isObjectORFunction, isFunction } from '../utils/is';
 import { TRY_CATCH_ERROR, PROMISE_STATUS, PROMISE_ID } from './const';
-import asap from './asap';
 export interface Thenable<R> {
   then<U>(
     onFulfilled?: (value: R) => U | Thenable<U>,
@@ -36,14 +35,13 @@ let id = 0;
 export default class Promise<R> implements Thenable<R> {
   private ['[[PromiseStatus]]']: PromiseStatus = 'pending';
   private ['[[PromiseValue]]']: any = undefined;
-  private subscribes: any[] = [];
+  subscribes: any[] = [];
 
   constructor(resolver: Resolver<R>) {
     this[PROMISE_ID] = id++;
 
     // resolver 必须为函数
     typeof resolver !== 'function' && resolverError();
-
     // 使用 Promise，需要用 new 操作符
     this instanceof Promise ? this.init(resolver) : constructorError();
   }
@@ -74,16 +72,14 @@ export default class Promise<R> implements Thenable<R> {
       subscribes,
       subscribes: { length }
     } = parent;
-
     subscribes[length] = child;
     subscribes[length + PROMISE_STATUS.fulfilled] = onFulfillment;
     subscribes[length + PROMISE_STATUS.rejected] = onRejection;
-
-    if (length === 0) {
-      this.asap(this.publish, parent);
+    if (length === 0 && PROMISE_STATUS[parent['[[PromiseStatus]]']]) {
+      this.asap(this.publish);
     }
   }
-  private asap(callback, context?) {
+  private asap(callback) {
     setTimeout(() => {
       callback.call(this);
     }, 1);
@@ -93,14 +89,12 @@ export default class Promise<R> implements Thenable<R> {
     const state = this['[[PromiseStatus]]'];
     const settled = PROMISE_STATUS[state];
     const result = this['[[PromiseValue]]'];
-
     if (subscribes.length === 0) {
       return;
     }
-
     for (let i = 0; i < subscribes.length; i += 3) {
       const item = subscribes[i];
-      const callback = subscribes[settled];
+      const callback = subscribes[i + settled];
       if (item) {
         this.invokeCallback(state, item, callback, result);
       } else {
@@ -236,11 +230,13 @@ export default class Promise<R> implements Thenable<R> {
       this.handleForeignThenable(value, then);
       return;
     }
+    // 非 Thenable
     this.fulfill(value);
   }
   private fulfill(value: any) {
     this['[[PromiseStatus]]'] = 'fulfilled';
     this['[[PromiseValue]]'] = value;
+
     if (this.subscribes.length !== 0) {
       this.asap(this.publish);
     }
@@ -268,11 +264,9 @@ export default class Promise<R> implements Thenable<R> {
   private mockReject(reason: any) {
     this['[[PromiseStatus]]'] = 'rejected';
     this['[[PromiseValue]]'] = reason;
-    this.asap(this.publishRejection);
+    this.asap(this.publish);
   }
-  private publishRejection() {
-    this.publish();
-  }
+
   then(onFulfilled?, onRejected?) {
     const parent: any = this;
     const child = new parent.constructor(() => {});
@@ -299,16 +293,61 @@ export default class Promise<R> implements Thenable<R> {
     return this.then(callback, callback);
   }
 
-  static resolve(object) {
-    return null;
+  static resolve(object: any) {
+    let Constructor = this;
+    if (
+      object &&
+      typeof object === 'object' &&
+      object.constructor === Constructor
+    ) {
+      return object;
+    }
+    let promise = new Constructor(() => {});
+    promise.mockResolve(object);
+    return promise;
   }
-  static reject(reason) {
-    return null;
+  static reject(reason: any) {
+    let Constructor = this;
+    let promise = new Constructor(() => {});
+    promise.mockReject(reason);
+    return promise;
   }
-  static all() {
-    return null;
+  static all(entries: any[]) {
+    let result = [];
+    let num = 0;
+    if (!Array.isArray(entries)) {
+      return new this((_, reject) =>
+        reject(new TypeError('You must pass an array to all.'))
+      );
+    } else {
+      if (entries.length === 0) {
+        return new this(resolve => resolve([]));
+      }
+      return new this((resolve, reject) => {
+        entries.forEach(item => {
+          this.resolve(item).then(data => {
+            result.push(data);
+            num++;
+            if (num === entries.length) {
+              resolve(result);
+            }
+          }, reject);
+        });
+      });
+    }
   }
-  static race() {
-    return null;
+  static race(entries: any[]) {
+    if (!Array.isArray(entries)) {
+      return new this((_, reject) =>
+        reject(new TypeError('You must pass an array to race.'))
+      );
+    } else {
+      return new this((resolve, reject) => {
+        let length = entries.length;
+        for (let i = 0; i < length; i++) {
+          this.resolve(entries[i]).then(resolve, reject);
+        }
+      });
+    }
   }
 }
