@@ -1,6 +1,11 @@
 import Promise from './core/promise';
 // import { Promise } from 'es6-promise';
 
+const promise1 = new Promise((resolve)=>{
+})
+
+const promise2 =  promise1.then()
+
 // const promise1 = new Promise((resolve, reject) => {
 //   setTimeout(() => {
 //     reject(1);
@@ -15,30 +20,30 @@ import Promise from './core/promise';
 //     console.log(err);
 //   });
 
-const promise1 = new Promise((resolve, reject) => {
-  setTimeout(() => {
-    resolve(1);
-  }, 500);
-});
+// const promise1 = new Promise((resolve, reject) => {
+//   setTimeout(() => {
+//     resolve(1);
+//   }, 500);
+// });
 
-const promise2 = new Promise(resolve => {
-  setTimeout(() => {
-    resolve(2);
-  }, 2000);
-});
-const promise3 = new Promise((resolve, reject) => {
-  setTimeout(() => {
-    resolve(3);
-  }, 1000);
-});
+// const promise2 = new Promise(resolve => {
+//   setTimeout(() => {
+//     resolve(2);
+//   }, 2000);
+// });
+// const promise3 = new Promise((resolve, reject) => {
+//   setTimeout(() => {
+//     resolve(3);
+//   }, 1000);
+// });
 
-Promise.all([promise1, promise2, promise3])
-  .then(data => {
-    console.log('data', data);
-  })
-  .catch(reason => {
-    console.log(reason);
-  });
+// Promise.all([promise1, promise2, promise3])
+//   .then(data => {
+//     console.log('data', data);
+//   })
+//   .catch(reason => {
+//     console.log(reason);
+//   });
 
 // const promise1 = new Promise((resolve, reject) => {
 //   // reject('error');

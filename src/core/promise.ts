@@ -158,6 +158,8 @@ export default class Promise<R> implements Thenable<R> {
     }
   }
   private handleOwnThenable(thenable: any) {
+    // 处理 value 为 promise 对象的情况
+
     const state = thenable['[[PromiseStatus]]'];
     const result = thenable['[[PromiseValue]]'];
 
@@ -165,7 +167,7 @@ export default class Promise<R> implements Thenable<R> {
       this.fulfill(result);
       return;
     }
-    if (state === 'fulfilled') {
+    if (state === 'rejected') {
       this.mockReject(result);
       return;
     }
@@ -176,15 +178,18 @@ export default class Promise<R> implements Thenable<R> {
       reason => this.mockReject(reason)
     );
   }
-  private tryThen(then, thenable, onFulfilled, onRejected) {
+  private tryThen(then, thenable, resolvePromise, rejectPromise) {
     try {
-      then.call(thenable, onFulfilled, onRejected);
+      then.call(thenable, resolvePromise, rejectPromise);
     } catch (e) {
       return e;
     }
   }
   private handleForeignThenable(thenable: any, then: any) {
     this.asap(() => {
+      // 如果 resolvePromise 和 rejectPromise 均被调用，
+      // 或者被同一参数调用了多次，则优先采用首次调用并忽略剩下的调用
+      // 此处 sealed (稳定否)，用于处理上诉逻辑
       let sealed = false;
       const error = this.tryThen(
         then,
@@ -205,7 +210,6 @@ export default class Promise<R> implements Thenable<R> {
             return;
           }
           sealed = true;
-
           this.mockReject(reason);
         }
       );
@@ -217,26 +221,30 @@ export default class Promise<R> implements Thenable<R> {
     });
   }
   private handleLikeThenable(value: any, then: any) {
+    // 处理 "真实" promise 对象
     if (this.isThenable(value, then)) {
       this.handleOwnThenable(value);
       return;
     }
+    // 获取 then 值失败且抛出异常，则以此异常为拒因 reject promise
     if (then === TRY_CATCH_ERROR) {
       this.mockReject(TRY_CATCH_ERROR.error);
       TRY_CATCH_ERROR.error = null;
       return;
     }
+    // 如果 then 是函数，则检验 then 方法的合法性
     if (isFunction(then)) {
       this.handleForeignThenable(value, then);
       return;
     }
-    // 非 Thenable
+    // 非 Thenable ，则将该终植直接交由 fulfill 处理
     this.fulfill(value);
   }
   private fulfill(value: any) {
     this['[[PromiseStatus]]'] = 'fulfilled';
     this['[[PromiseValue]]'] = value;
 
+    // 用于处理异步情况
     if (this.subscribes.length !== 0) {
       this.asap(this.publish);
     }
@@ -250,15 +258,17 @@ export default class Promise<R> implements Thenable<R> {
     }
   }
   private mockResolve(value: any) {
-    // resolve 不能传入当前 Promise 实例
+    // resolve 不能传入当前 then 返回的 Promise 对象，否则会报 TypeError
     if (value === this) {
       this.mockReject(resolveSelfError);
       return;
     }
+    // 处理 value 为其他有效 JavaScript 的情况
     if (!isObjectORFunction(value)) {
       this.fulfill(value);
       return;
     }
+    // 处理 value 为 Thenable 的情况
     this.handleLikeThenable(value, this.getThen(value));
   }
   private mockReject(reason: any) {
@@ -270,7 +280,10 @@ export default class Promise<R> implements Thenable<R> {
   then(onFulfilled?, onRejected?) {
     const parent: any = this;
     const child = new parent.constructor(() => {});
+
+    // promise 各状态对应枚举值 'pending' 对应 0 ，'fulfilled' 对应 1，'rejected' 对应 2
     const state = PROMISE_STATUS[this['[[PromiseStatus]]']];
+    debugger
     if (state) {
       const callback = arguments[state - 1];
       this.asap(() =>
@@ -282,6 +295,7 @@ export default class Promise<R> implements Thenable<R> {
         )
       );
     } else {
+      // 调用 then方法 的 promise 处于 pending 状态的处理逻辑，一般为异步情况。
       this.subscribe(parent, child, onFulfilled, onRejected);
     }
     return child;
