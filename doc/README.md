@@ -1,4 +1,4 @@
-# 从 TS 造 Promise 建立前端安全感
+# 从 TS 造 Promise 的过程建立前端安全感
 
 你还在用 npm 的 star 数来选择依赖吗？在 **npm 安全性问题随时爆发** 的今天，作为前端开发者的我们应该具备源码阅读的能力，最好知道自己在用什么，这样在使用外部 `npm` 依赖时才有安全感不是么?
 
@@ -32,7 +32,7 @@ Promise 出现在 Es6 ，如果 Es5 需要使用 Promise，通常需要用到 `P
 
 来看笔者用心画的一张 API 结构图 ( 看不清楚的可以进我的 [GitHub](https://github.com/leer0911/myPromise) 看，有大图和 xmind 源文件 )：
 
-![](img/1.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/1.png)
 
 上图只是一个 **Promise 的 API 蓝图**，其实 `Promises/A+` 规范并不设计如何创建、解决和拒绝 promise，而是专注于提供一个通用的 then 方法。所以，Promise/A+ 规范的实现可以与那些不太规范但可用的实现能良好共存。如果大家都按规范来，那么就没有那么多兼容问题。(PS：包括 web 标准 ) 接着聊下 `Promises/A+`，看过的可以跳过。
 
@@ -42,7 +42,7 @@ Promise 出现在 Es6 ，如果 Es5 需要使用 Promise，通常需要用到 `P
 
 ### 术语
 
-![](img/7.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/7.png)
 
 - `Promise` 一个拥有 `then` 方法的对象或函数，其行为符合 `Promises/A+` 规范；
 
@@ -104,7 +104,7 @@ promise.then(onFulfilled, onRejected);
 
 先来看下 promise 执行过程：
 
-![](img/8.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/8.png)
 
 大致的过程是，promise 会从 `pending` 转为 `fulfilled` 或 `rejected` ，然后对应调用 `then` 方法参数的 `onFulfilled` 或 `onRejected` ，最终返回 `promise` 对象。
 
@@ -200,11 +200,11 @@ promise1
 
 另外 promise 不能与 x 相等即 `promise !== x`,否则：
 
-![](./img/same.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/same.png)
 
 下面来看张图，大致了解下各情况的应对方式：
 
-![](./img/resolve.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/resolve.png)
 
 ### `Promise/A+` 小结
 
@@ -220,11 +220,11 @@ Promise 本身是一个构造函数，即可以实现为类。接下来，主要
 
 Promise 提供的 API：
 
-![](./img/3.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/3.png)
 
 Promise 内部属性包括：
 
-![](./img/2.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/2.png)
 
 下面开始正式的实现部分
 
@@ -234,7 +234,7 @@ Promise 内部属性包括：
 
 主要包括：
 
-![](./img/4.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/4.png)
 
 TypeScript 中声明文件用于外部模块，是 TypeScript 的核心部分。另外，从一个声明文件就可以大致了解所用模块暴露的 API 情况 (接受什么类型，或者会返回什么类型的数据)。这种事先设计好 API 是一个好的开发习惯，但实际开发中会比较难。
 
@@ -292,7 +292,7 @@ class Promise {
 
 通过前面规范部分，我们了解到 `[[Resolve]]` 属于内部实现，用于处理 then 参数的返回值。也就是这里即将要实现的名为 `mockResolve` 的方法。
 
-![](./img/5.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/5.png)
 
 根据规范内容可以得知，`mockResolve` 方法接受的 value 可能为 Promise，thenable，以及其他有效 JavaScript 值。
 
@@ -634,7 +634,7 @@ promise.then(value => {
 
 ### then 方法小结
 
-![](./img/6.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/6.png)
 
 到这我们就实现了 promise 中的 then 方法，也就意味着目前实现的 promise 已经具备处理异步数据流的能力了。then 方法的实现离不开规范的指引，只要参考规范对 then 方法的描述，其余就只是逻辑处理了。
 
@@ -790,7 +790,7 @@ Promise 的出现是为了更好地处理异步数据流，或者常说的回调
 
 先来看一些概念，Stack，Heap，Queue，直接上图：
 
-![](./img/q.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/q.png)
 
 - 那些不需要回调函数的操作都可归为 Stack 这一类
 
@@ -804,7 +804,7 @@ JS 引擎线程用来执行栈中的**同步任务**，当所有同步任务**�
 
 JS 引擎线程从消息队列中读取任务是不断循环的，**每次栈被清空后**，都会在消息队列中读取新的任务，如果没有新的任务，就会等待，直到有新的任务，这就叫**事件循环**。
 
-![](./img/event.png)
+![](https://raw.githubusercontent.com/leer0911/myPromise/master/doc/img/event.png)
 
 这张图不知道谁画的，真的是非常棒!先借来描述下 AJAX 大概的流程：
 
